@@ -37,7 +37,7 @@ As of v0.3, the documentation is up-to-date following a bug that started with v0
 This sample code shows how to search through a dataset, retrieve station data, make a plot and convert the data to CSV format:
 
 ```python
-from pyhreadex import Dataset
+from pythreadex import Dataset
 import matplotlib.pyplot as plt
             
 # Create an instance of Dataset
