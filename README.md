@@ -29,11 +29,6 @@ python setup.py install
 - pandas >= 1.3.0
 
 ## Sample Usage
-For full documentation and examples, please refer to [Tropycal Documentation](https://tropycal.github.io/tropycal/).
-
-As of v0.3, the documentation is up-to-date following a bug that started with v0.2.5 where the documentation was not updated with each release.
-
-## Sample Usage
 This sample code shows how to search through a dataset, retrieve station data, make a plot and convert the data to CSV format:
 
 ```python
