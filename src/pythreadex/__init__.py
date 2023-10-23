@@ -686,7 +686,8 @@ class Station:
         # Set limit of days
         start_count = int((start_lim - dt.datetime(2015,1,1)).total_seconds()/86400)
         end_count = int((end_lim - dt.datetime(2015,1,1)).total_seconds()/86400)
-        ax.set_xlim(climo[mode]['days'][start_count],climo[mode]['days'][end_count])
+        climo_mode = 'max' if mode == 'both' else mode
+        ax.set_xlim(climo[climo_mode]['days'][start_count],climo[climo_mode]['days'][end_count])
 
         # Determine y-lim based on subset data
         check_store = {
