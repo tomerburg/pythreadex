@@ -317,6 +317,23 @@ class Station:
         """
         
         self.data_original.set_index(self.data.columns[0]).to_csv(filename)
+    
+    def get_daily_climatology(self, date):
+        r"""
+        Returns all data for the given calendar date.
+        
+        Parameters
+        ----------
+        date : datetime.datetime
+            Datetime object containing the requested date. The year is ignored for this purpose.
+        
+        Returns
+        -------
+        Pandas.DataFrame
+            Filtered data for this calendar date.
+        """
+        
+        return self.data[self.data['date'].str.contains(date.strftime('-%m-%d$'))]
         
     def calc_temperature_climatology(self, modes, climatology=None, return_df=False):
         r"""
