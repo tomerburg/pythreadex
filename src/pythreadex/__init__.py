@@ -736,6 +736,138 @@ class Station:
                 ha='right', va='bottom', alpha=0.6, fontsize=9, transform=ax.transAxes)
 
         return ax
+    
+    def plot_climatology_comparison(self, mode, climatology_start=None, climatology_end=None, date_range=None):
+        r"""
+        Plots a comparison of two climatologies.
+        
+        Parameters
+        ----------
+        mode : str
+            Plotting mode. Can be "max", "min", or "average".
+        climatology_start : tuple, optional
+            Tuple with 2 elements denoting the start and end years of the starting climatology. If None (default), the earliest available 30-year climatology is used.
+        climatology_end : tuple, optional
+            Tuple with 2 elements denoting the start and end years of the ending climatology. If None (default), the latest available 30-year climatology is used.
+        date_range : list or tuple, optional
+            List or tuple with 2 elements denoting the start and end dates (e.g., ``['7/1', '11/30']``). If None (default), the full year is plotted.
+        
+        Returns
+        -------
+        matplotlib.pyplot.axes
+            Axes instance containing the plot.
+        
+        Notes
+        -----
+        This plotting function ignores February 29th.
+        """
+        
+        # Apply basic quality control to data
+        if mode not in ['max', 'min', 'average']:
+            raise ValueError('Acceptable values for "mode" are "max", "min" or "average".')
+        if mode == 'average':
+            data = self.filtered_data['both'].copy()
+        else:
+            data = self.filtered_data[mode].copy()
+        if date_range is None:
+            date_range = ['1/1', '12/31']
+
+        # Determine start & end climatology ranges
+        dates = [pd.to_datetime(i) for i in data['date']]
+        years = np.unique([int(i.year) for i in dates])
+        nearest_start_year = round_to_ten(years[0])+1
+        if nearest_start_year-10 in years:
+            nearest_start_year = nearest_start_year - 10
+        if climatology_start is None:
+            climatology_start = (nearest_start_year,nearest_start_year+29)
+        nearest_end_year = round_to_ten(years[-2])-10
+        if climatology_end is None:
+            climatology_end = (nearest_end_year-29,nearest_end_year)
+        
+        # Calculate start & end climatologies
+        climo_start = self.calc_temperature_climatology(mode, climatology_start)
+        climo_end = self.calc_temperature_climatology(mode, climatology_end)
+        
+        # Create figure
+        fig,ax = plt.subplots(figsize=(9,6),dpi=200)
+        ax.grid(axis='y')
+
+        # Plot month ticks and labels
+        start_lim = dt.datetime.strptime(f'2015/{date_range[0]}','%Y/%m/%d')
+        end_lim = dt.datetime.strptime(f'2015/{date_range[1]}','%Y/%m/%d')
+        diff_lim = (end_lim-start_lim).total_seconds()/86400
+        if diff_lim > 90:
+            julian_data = months_in_julian(2015)
+            xticks = julian_data['start']
+            for i,(istart,iend) in enumerate(zip(xticks[::2],xticks[1:][::2])):
+                ax.axvspan(istart,iend,color='#e4e4e4',alpha=0.5,zorder=0)
+                ax.axvline(istart,linestyle='-',color='k',zorder=20,alpha=0.3,linewidth=0.5)
+                ax.axvline(iend,linestyle='-',color='k',zorder=20,alpha=0.3,linewidth=0.5)
+            ax.set_xticks(julian_data['midpoint'])
+            ax.set_xticklabels(julian_data['name'])
+        else:
+            xticks = []
+            xticklabels = []
+            iter_lim = start_lim + dt.timedelta(hours=0)
+            while iter_lim <= end_lim + dt.timedelta(hours=24*7):
+                xticks.append(convert_to_julian(iter_lim))
+                xticklabels.append(iter_lim.strftime('%b %d'))
+                iter_lim += dt.timedelta(hours=24*7)
+            for i,(istart,iend) in enumerate(zip(xticks[::2],xticks[1:][::2])):
+                ax.axvspan(istart,iend,color='#e4e4e4',alpha=0.5,zorder=0)
+                ax.axvline(istart,linestyle='-',color='k',zorder=20,alpha=0.3,linewidth=0.5)
+                ax.axvline(iend,linestyle='-',color='k',zorder=20,alpha=0.3,linewidth=0.5)
+            ax.set_xticks(xticks)
+            ax.set_xticklabels(xticklabels)
+        ax.set_ylabel("Temperature (F)")
+        
+        # Plot climatological data
+        color_store = {
+            'max': {'start': '#FE7979', 'end': '#BD0A0A', 'mean_start': '#D20909', 'mean_end': '#750000'},
+            'min': {'start': '#75B4FB', 'end': '#1668C2', 'mean_start': '#4343F9', 'mean_end': '#001295'},
+            'average': {'start': '#B67EFD', 'end': '#7024D1', 'mean_start': '#9730DD', 'mean_end': '#6307A2'},
+        }
+        ax.fill_between(climo_start[mode]['days'],climo_start[mode]['p10'],climo_start[mode]['p90'],
+                        color=color_store.get(mode)['start'],alpha=0.2,zorder=4,label='10-90th Percentile (Start)')
+        ax.fill_between(climo_end[mode]['days'],climo_end[mode]['p10'],climo_end[mode]['p90'],
+                        color=color_store.get(mode)['end'],alpha=0.2,zorder=4,label='10-90th Percentile (End)')
+        ax.plot(climo_start[mode]['days'],climo_start[mode]['average'],color_store.get(mode)['mean_start'],
+                zorder=5,linewidth=2.0,label=f'Average (Start)')
+        ax.plot(climo_end[mode]['days'],climo_end[mode]['average'],color_store.get(mode)['mean_end'],
+                zorder=5,linewidth=2.0,label=f'Average (End)')
+        ax.plot(climo_start[mode]['days'],climo_start[mode]['p90'],color_store.get(mode)['start'],
+                zorder=5,linewidth=0.5,linestyle='dashed')
+        ax.plot(climo_start[mode]['days'],climo_start[mode]['p10'],color_store.get(mode)['start'],
+                zorder=5,linewidth=0.5,linestyle='dashed')
+        ax.plot(climo_end[mode]['days'],climo_end[mode]['p90'],color_store.get(mode)['end'],
+                zorder=5,linewidth=0.5,linestyle='dashed')
+        ax.plot(climo_end[mode]['days'],climo_end[mode]['p10'],color_store.get(mode)['end'],
+                zorder=5,linewidth=0.5,linestyle='dashed')
+
+        # Set limit of days
+        start_count = int((start_lim - dt.datetime(2015,1,1)).total_seconds()/86400)
+        end_count = int((end_lim - dt.datetime(2015,1,1)).total_seconds()/86400)
+        ax.set_xlim(climo_start[mode]['days'][start_count],climo_start[mode]['days'][end_count])
+
+        # Add plot legend
+        ax.legend(bbox_to_anchor=(0., -.11, 1., -1.02), loc=3, ncol=4, mode="expand", borderaxespad=0.)
+
+        # Format and add plot title
+        plot_title = f'{self.attrs["name"]}, {self.attrs["state"]}\n'
+        if mode == 'min':
+            plot_title += f'Minimum Temperatures'
+        elif mode == 'max':
+            plot_title += f'Maximum Temperatures'
+        else:
+            plot_title += 'Average Temperatures'
+        a = ax.set_title(plot_title,loc='left',fontsize=12)
+        right_title = f"Start Climatology: {climatology_start[0]} - {climatology_start[1]}"
+        right_title += f"\nEnd Climatology: {climatology_end[0]} - {climatology_end[1]}"
+        ax.set_title(right_title,loc='right',fontsize=10)
+        ax.text(0.99,0.01,'Image generated by pythreadex | Data from ThreadEx',
+                ha='right', va='bottom', alpha=0.6, fontsize=9, transform=ax.transAxes)
+
+        return ax
 
     def plot_snow_time_series(self, season=None, rolling_days=None, climatology=None, climatology_years=30):
         r"""
